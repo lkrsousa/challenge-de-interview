@@ -3,6 +3,7 @@ from equipment import EquipmentReader
 from pyspark.sql import DataFrame
 from pyspark.sql import SparkSession
 
+
 class TestEquipmentReader:
 
     def test_read_json(self):
