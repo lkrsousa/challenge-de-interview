@@ -1,8 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import avg, max, count, desc, asc
 from equipment import EquipmentReader
 from equipment_failure import EquipmentFailureReader
 from equipment_sensor import EquipmentSensorReader
+from pyspark.sql import types as T
 
 spark = SparkSession.builder.appName("read_sensor_data").getOrCreate()
 

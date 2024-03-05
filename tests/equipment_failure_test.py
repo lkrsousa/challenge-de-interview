@@ -3,6 +3,7 @@ from equipment_failure import EquipmentFailureReader
 from pyspark.sql import DataFrame
 from pyspark.sql import SparkSession
 from pyspark.sql import types as T
+from pyspark.sql.functions import avg, max, count, desc, asc
 
 
 class TestEquipmentFailureReader:
@@ -61,17 +62,21 @@ class TestEquipmentFailureReader:
             T.StructType(
                 [
                     T.StructField("equipment_id", T.StringType(), True),
-                    T.StructField("sensor_id", T.StringType(), True)
+                    T.StructField("sensor_id", T.StringType(), True),
                 ]
             ),
         )
 
-        assert isinstance(self.equipment_reader.join_sensor_data(sensor_data, equip_failure), DataFrame)
+        assert isinstance(
+            self.equipment_reader.join_sensor_data(sensor_data, equip_failure),
+            DataFrame,
+        )
 
     def test_total_equipment_failure(self):
-        equip_failure = self.spark.createDataFrame([
-            ("2021-05-18 0:20:48", "ERROR", 5820, 311.29, 6749.50, 1, 4275),
-            ("2021-05-18 0:20:48", "ERROR", 5820, 311.29, 6749.50, 2, 4276)
+        equip_failure = self.spark.createDataFrame(
+            [
+                ("2021-05-18 0:20:48", "ERROR", 5820, 311.29, 6749.50, 1, 4275),
+                ("2021-05-18 0:20:48", "ERROR", 5820, 311.29, 6749.50, 2, 4276),
             ],
             T.StructType(
                 [
@@ -86,14 +91,15 @@ class TestEquipmentFailureReader:
             ),
         )
 
-        total = self.spark.createDataFrame([
-            (2,),
+        total = self.spark.createDataFrame(
+            [
+                (2,),
             ],
-                T.StructType(
-        [
-            T.StructField("total_failure", T.LongType(), False),
-        ]
-    ),
+            T.StructType(
+                [
+                    T.StructField("total_failure", T.LongType(), False),
+                ]
+            ),
         )
 
         data = self.equipment_reader.get_total_equipment_failure(equip_failure)
@@ -121,8 +127,8 @@ class TestEquipmentFailureReader:
 
         expected_result = self.spark.createDataFrame(
             [
-                (1,1),
-                (2,1),
+                (1, 1),
+                (2, 1),
             ],
             T.StructType(
                 [
@@ -133,9 +139,6 @@ class TestEquipmentFailureReader:
         )
 
         result = self.equipment_reader.get_quantity_of_fail(equip_failure)
-
-        result.printSchema()
-        expected_result.printSchema()
 
         assert result.collect() == expected_result.collect()
 
@@ -157,8 +160,8 @@ class TestEquipmentFailureReader:
 
         quantity_of_fail = self.spark.createDataFrame(
             [
-                (1,1),
-                (2,5),
+                (1, 1),
+                (2, 5),
             ],
             T.StructType(
                 [
@@ -168,6 +171,114 @@ class TestEquipmentFailureReader:
             ),
         )
 
-        result = self.equipment_reader.get_equipment_most_failed(quantity_of_fail, equipments)
+        result = self.equipment_reader.get_equipment_most_failed(
+            quantity_of_fail, equipments
+        )
 
         assert result == "43B81579"
+
+    def test_get_average_failures_by_group(self):
+
+        expected_result = self.spark.createDataFrame(
+            [
+                ("FGHQWR2Q", 1.0),
+                ("VAPQY59S", 5.0),
+            ],
+            T.StructType(
+                [
+                    T.StructField("group_name", T.StringType(), True),
+                    T.StructField("avg(count_failure)", T.DoubleType(), True),
+                ]
+            ),
+        )
+
+        equipments = self.spark.createDataFrame(
+            [
+                ("1", "FGHQWR2Q", "5310B9D7"),
+                ("2", "VAPQY59S", "43B81579"),
+            ],
+            T.StructType(
+                [
+                    T.StructField("equipment_id", T.StringType(), True),
+                    T.StructField("group_name", T.StringType(), True),
+                    T.StructField("name", T.StringType(), True),
+                ]
+            ),
+        )
+
+        quantity_of_fail = self.spark.createDataFrame(
+            [
+                (1, 1),
+                (2, 5),
+            ],
+            T.StructType(
+                [
+                    T.StructField("equipment_id", T.StringType(), True),
+                    T.StructField("count_failure", T.LongType(), True),
+                ]
+            ),
+        )
+
+        result = self.equipment_reader.get_average_failures_by_group(
+            quantity_of_fail, equipments
+        )
+
+        assert result.collect() == expected_result.collect()
+
+    def test_get_sensor_most_failed_by_equipment(self):
+
+        expected_result = self.spark.createDataFrame(
+            [
+                ("5310B9D7", "FGHQWR2Q", 1),
+            ],
+            T.StructType(
+                [
+                    T.StructField("name", T.StringType(), True),
+                    T.StructField("group_name", T.StringType(), True),
+                    T.StructField("max_count", T.LongType(), True),
+                ]
+            ),
+        )
+
+        equipments = self.spark.createDataFrame(
+            [
+                ("1", "FGHQWR2Q", "5310B9D7"),
+                ("2", "VAPQY59S", "43B81579"),
+            ],
+            T.StructType(
+                [
+                    T.StructField("equipment_id", T.StringType(), True),
+                    T.StructField("group_name", T.StringType(), True),
+                    T.StructField("name", T.StringType(), True),
+                ]
+            ),
+        )
+
+        equipment_failure_formated = self.spark.createDataFrame(
+            [("2021-05-18 0:20:48", "ERROR", 4275, 311.29, 6749.50)],
+            T.StructType(
+                [
+                    T.StructField("timestamp", T.StringType(), True),
+                    T.StructField("level", T.StringType(), True),
+                    T.StructField("sensor_id", T.IntegerType(), True),
+                    T.StructField("temperature", T.FloatType(), True),
+                    T.StructField("vibration", T.FloatType(), True),
+                ]
+            ),
+        )
+
+        sensor_data = self.spark.createDataFrame(
+            [(1, 4275)],
+            T.StructType(
+                [
+                    T.StructField("equipment_id", T.StringType(), True),
+                    T.StructField("sensor_id", T.StringType(), True),
+                ]
+            ),
+        )
+
+        result = self.equipment_reader.get_sensor_most_failed_by_equipment(
+            equipment_failure_formated, sensor_data, equipments
+        )
+
+        assert result.collect() == expected_result.collect()
